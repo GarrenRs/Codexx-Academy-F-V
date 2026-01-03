@@ -1,9 +1,21 @@
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import JSON
 import uuid
 
 db = SQLAlchemy()
+
+# Custom JSON type that uses JSONB on PostgreSQL and JSON/Text on SQLite
+class SafeJSON(db.TypeDecorator):
+    impl = JSON
+    cache_ok = True
+
+    def load_dialect_impl(self, dialect):
+        if dialect.name == 'postgresql':
+            from sqlalchemy.dialects.postgresql import JSONB
+            return dialect.type_descriptor(JSONB())
+        else:
+            return dialect.type_descriptor(JSON())
 
 class Workspace(db.Model):
     __tablename__ = 'workspaces'
@@ -25,7 +37,7 @@ class User(db.Model):
     role = db.Column(db.String(50), default='admin')
     is_active = db.Column(db.Boolean, default=True)
     is_verified = db.Column(db.Boolean, default=False)
-    badges = db.Column(JSONB, default=[]) # List of badges: ["verified", "top_expert", "master"]
+    badges = db.Column(SafeJSON, default=[]) # List of badges: ["verified", "top_expert", "master"]
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 class Project(db.Model):
@@ -35,7 +47,7 @@ class Project(db.Model):
     title = db.Column(db.String(255), nullable=False)
     description = db.Column(db.Text)
     image = db.Column(db.String(500))
-    technologies = db.Column(JSONB, default=[])
+    technologies = db.Column(SafeJSON, default=[])
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 class Skill(db.Model):
